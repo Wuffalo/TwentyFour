@@ -7,6 +7,13 @@
 import pandas as pd
 import xlsxwriter
 import os
+from datetime import datetime as dt, timedelta
+
+def get_col_widths(dataframe):
+    # First we find the maximum length of the index column   
+    idx_max = max([len(str(s)) for s in dataframe.index.values] + [len(str(dataframe.index.name))])
+    # Then, we concatenate this to the max of the lengths of column name and its values for each column, left to right
+    return [idx_max] + [max([len(str(s)) for s in dataframe[col].values] + [len(col)]) for col in dataframe.columns]
 
 def format_sheet(X):
     X = X+1
@@ -14,14 +21,14 @@ def format_sheet(X):
     worksheet.set_column('B:B',45)
     worksheet.set_column('C:C',5)
     worksheet.set_column('D:D',7)
-    worksheet.set_column('E:E',20)
-    worksheet.set_column('F:F',14)
-    worksheet.set_column('G:G',21)
+    worksheet.set_column('E:E',19)
+    worksheet.set_column('F:F',17)
+    worksheet.set_column('G:G',19)
     worksheet.set_column('H:H',11)
     worksheet.set_column('I:I',5)
     worksheet.set_column('J:J',28)
     worksheet.set_column('K:K',14,format5)
-    worksheet.conditional_format('J2:J'+str(X), {'type': 'duplicate',
+    worksheet.conditional_format('K2:K'+str(X), {'type': 'duplicate',
                                         'format': format4})
     worksheet.conditional_format('E2:E'+str(X), {
         'type': 'date',
@@ -56,8 +63,10 @@ if os.path.exists(path_to_output):
 
 ctime = dt.now()
 
-path_to_SOS = '/mnt/shared-drive/operations/data/Shipment Order Summary (PICKZONE).csv'
-update_time = os.path.getctime(path_to_SOS
+path_to_SOS = '/mnt/shared-drive/Operations/Data/Shipment Order Summary (PICK ZONE).csv'
+
+file_time = os.path.getctime(path_to_SOS)
+update_time = dt.fromtimestamp(file_time).strftime('%m/%d/%Y %H:%M')
 
 df = pd.read_csv(path_to_SOS, parse_dates=[11,19], infer_datetime_format=True)
 
@@ -71,7 +80,7 @@ df = df.rename(columns={'EXTERNORDERKEY':'SO-SS','C_COMPANY':'Customer','ADDDATE
                         'TOTALORDERED':'QTY','SVCLVL':'Carrier','EXTERNALLOADID':'Load ID','EDITDATE':'Last Edit',
                         'C_STATE':'State','C_COUNTRY':'Country','Textbox6':'TIS'})
 
-writer = pd.ExcelWriter(path_to_excel, engine='xlsxwriter')
+writer = pd.ExcelWriter(path_to_output, engine='xlsxwriter')
 workbook = writer.book
 
 # Light red fill with dark red text.
@@ -93,24 +102,24 @@ remove_rtv = df['TYPEDESCR'] == 'RTV Move'
 remove_NS = df['Status'] == 'Not Started'
 remove_Lo = df['Status'] == 'Loaded'
 
-df_loaded = df['Status'] == 'Loaded'
+df_loaded = df[df['Status'] == 'Loaded']
 
 df.drop(df[remove_rtv|remove_NS|remove_Lo].index, inplace=True)
 
 df['Add Hour'] = df['Add Date'].dt.floor('1H')
 
 df.sort_values(by=['Add Hour','Status','Carrier'], inplace=True)
-df_loaded.sort_values(by=['Carrier','TIS'], inplace=True)
+df_loaded.sort_values(by=['Carrier'])
 
 df = df.drop(columns=['TYPEDESCR','CUSTID','PROMISEDATE','Add Hour'])
-df = df.drop(columns=['CUSTID','PROMISEDATE'])
+df_loaded = df_loaded.drop(columns=['CUSTID','PROMISEDATE','Status'])
 
 main_length = len(df.index)
 loaded_length = df_loaded.TIS.count()
 
 df.to_excel(writer, sheet_name='24Hour', index=False)
 worksheet = writer.sheets['24Hour']
-worksheet.write('G1',"Last Update at: "+update_time)
+worksheet.write('M1',"Last Update at: "+str(update_time))
 format_sheet(main_length)
 
 df_loaded.to_excel(writer, sheet_name='Loaded', index=False)
