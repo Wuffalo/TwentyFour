@@ -9,12 +9,6 @@ import xlsxwriter
 import os
 from datetime import datetime as dt, timedelta
 
-def get_col_widths(dataframe):
-    # First we find the maximum length of the index column   
-    idx_max = max([len(str(s)) for s in dataframe.index.values] + [len(str(dataframe.index.name))])
-    # Then, we concatenate this to the max of the lengths of column name and its values for each column, left to right
-    return [idx_max] + [max([len(str(s)) for s in dataframe[col].values] + [len(col)]) for col in dataframe.columns]
-
 def format_sheet(X):
     X = X+1
     worksheet.set_column('A:A',13)
@@ -25,7 +19,7 @@ def format_sheet(X):
     worksheet.set_column('F:F',17)
     worksheet.set_column('G:G',19)
     worksheet.set_column('H:H',11)
-    worksheet.set_column('I:I',5)
+    worksheet.set_column('I:I',7,format6)
     worksheet.set_column('J:J',28)
     worksheet.set_column('K:K',14,format5)
     worksheet.conditional_format('K2:K'+str(X), {'type': 'duplicate',
@@ -72,7 +66,7 @@ df = pd.read_csv(path_to_SOS, parse_dates=[11,19], infer_datetime_format=True)
 
 #columns to delete - INITIAL PASS
 df = df.drop(columns=['ORDERKEY','SO','SS','STORERKEY','INCOTERMS','ORDERDATE','ACTUALSHIPDATE','DAYSPASTDUE',
-                'PASTDUE','ORDERVALUE','TOTALSHIPPED','EXCEP','STOP','PSI_FLAG','UDFNOTES','INTERNATIONALFLAG',
+                'PASTDUE','ORDERVALUE','TOTALSHIPPED','EXCEP','STOP','PSI_FLAG','SUSR5','INTERNATIONALFLAG',
                 'BILLING','LOADEDTIME','UDFVALUE1'])
 
 #rename remaining columns
@@ -80,7 +74,10 @@ df = df.rename(columns={'EXTERNORDERKEY':'SO-SS','C_COMPANY':'Customer','ADDDATE
                         'TOTALORDERED':'QTY','SVCLVL':'Carrier','EXTERNALLOADID':'Load ID','EDITDATE':'Last Edit',
                         'C_STATE':'State','C_COUNTRY':'Country','Textbox6':'TIS'})
 
-writer = pd.ExcelWriter(path_to_output, engine='xlsxwriter')
+#remove commas from number columns, allows for reading as number then formatting on output
+# df['QTY'] = df['QTY'].str.replace(',', '')
+
+writer = pd.ExcelWriter(path_to_output, engine='xlsxwriter', options={'strings_to_numbers': True})
 workbook = writer.book
 
 # Light red fill with dark red text.
@@ -96,6 +93,7 @@ format3 = workbook.add_format({'bg_color':    '#ffeb99',
 format4 = workbook.add_format({'bg_color':   '#C6EFCE',
                                'font_color': '#006100'})
 format5 = workbook.add_format({'num_format': '#'})
+format6 = workbook.add_format({'num_format': '#,##0'})
 
 #CREATE QUERIES TO REMOVE
 remove_rtv = df['TYPEDESCR'] == 'RTV Move'
@@ -106,22 +104,28 @@ df_loaded = df[df['Status'] == 'Loaded']
 
 df.drop(df[remove_rtv|remove_NS|remove_Lo].index, inplace=True)
 
+# create column that floors Add Date by hour
 df['Add Hour'] = df['Add Date'].dt.floor('1H')
 
+# sort dataframes
 df.sort_values(by=['Add Hour','Status','Carrier'], inplace=True)
-df_loaded.sort_values(by=['Carrier'])
+df_loaded.sort_values(by=['Carrier']) # cannot use inplace because copy of df error
 
+# drop columns
 df = df.drop(columns=['TYPEDESCR','CUSTID','PROMISEDATE','Add Hour'])
 df_loaded = df_loaded.drop(columns=['CUSTID','PROMISEDATE','Status'])
 
+# calculate lengths of dataframes
 main_length = len(df.index)
 loaded_length = df_loaded.TIS.count()
 
+# create and format sheet of most normal orders
 df.to_excel(writer, sheet_name='24Hour', index=False)
 worksheet = writer.sheets['24Hour']
 worksheet.write('M1',"Last Update at: "+str(update_time))
 format_sheet(main_length)
 
+# create and format sheet of Loaded orders
 df_loaded.to_excel(writer, sheet_name='Loaded', index=False)
 worksheet = writer.sheets['Loaded']
 format_sheet(loaded_length)
