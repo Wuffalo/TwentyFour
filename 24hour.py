@@ -8,6 +8,7 @@ import pandas as pd
 import xlsxwriter
 import os
 from datetime import datetime as dt, timedelta
+import glob
 
 def format_sheet(X):
     X = X+1
@@ -57,12 +58,25 @@ if os.path.exists(path_to_output):
 
 ctime = dt.now()
 
-path_to_SOS = '/mnt/shared-drive/Operations/Data/Shipment Order Summary (PICK ZONE).csv'
+#Begin examining local Download folder against shared SOS to choose best automatically
+list_of_files = glob.glob('/mnt/c/Users/WMINSKEY/Downloads/Shipment Order Summary -*.csv') # * means all if need specific format then *.csv
+path_to_localSOS = max(list_of_files, key=os.path.getctime)
 
-file_time = os.path.getctime(path_to_SOS)
-update_time = dt.fromtimestamp(file_time).strftime('%m/%d/%Y %H:%M')
+path_to_sharedSOS = '/mnt/shared-drive/Operations/Data/Shipment Order Summary (PICK ZONE).csv'
 
-df = pd.read_csv(path_to_SOS, parse_dates=[11,19], infer_datetime_format=True)
+file_time_shared = os.path.getctime(path_to_sharedSOS)
+file_time_local = os.path.getctime(path_to_localSOS)
+
+if file_time_shared > file_time_local:
+    path_to_bestSOS = path_to_sharedSOS
+    file_time_best = file_time_shared
+else:
+    path_to_bestSOS = path_to_localSOS
+    file_time_best = file_time_local
+
+#Use best SOS for program
+update_time = dt.fromtimestamp(file_time_best).strftime('%m/%d/%Y %H:%M')
+df = pd.read_csv(path_to_bestSOS, parse_dates=[11,19], infer_datetime_format=True)
 
 #columns to delete - INITIAL PASS
 df = df.drop(columns=['ORDERKEY','SO','SS','STORERKEY','INCOTERMS','ORDERDATE','ACTUALSHIPDATE','DAYSPASTDUE',
