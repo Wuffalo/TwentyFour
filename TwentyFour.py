@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-2019
+2021
 @author: wuffalo
 """
 
@@ -46,37 +46,34 @@ def format_sheet(X):
         'format': format3
         })
 
-output_directory = "/mnt/shared-drive/05 - Office/OTS/Wolf/"
+output_directory = "/mnt/shared-drive/04 - SLC Operations/24Hour Report/"
 output_file_name = "24Hour.xlsx"
 path_to_output = output_directory+output_file_name
 
+def empty_folder(dir,name,ext): #directory to remove old files, search term and file extension are optional
+    old_files = glob.glob(dir+'*'+name+'*'+ext)
+    for f in old_files:
+        try:
+            os.remove(f)
+        except:
+            pass
+
 if os.path.exists(path_to_output):
     if os.path.exists(output_directory+'~$'+output_file_name):
-        # print("File is in use. Close \'"+path_to_output+"\' to try again.")
-        raise SystemExit
-    else: os.remove(path_to_output)
+        empty_folder(output_directory,'24Hour','.xlsx')
+        path_to_output = output_directory+os.path.splitext(output_file_name)[0]+str(dt.now().strftime(' %b%d %Hh%Mm '))+".xlsx"
+    else:
+        empty_folder(output_directory,'24Hour','.xlsx')
 
 ctime = dt.now()
 
-#Begin examining local Download folder against shared SOS to choose best automatically
-list_of_files = glob.glob('/mnt/c/Users/WMINSKEY/Downloads/Shipment Order Summary -*.csv') # * means all if need specific format then *.csv
-path_to_localSOS = max(list_of_files, key=os.path.getctime)
-
 path_to_sharedSOS = '/mnt/shared-drive/Operations/Data/Shipment Order Summary (PICK ZONE).csv'
 
-file_time_shared = os.path.getctime(path_to_sharedSOS)
-file_time_local = os.path.getctime(path_to_localSOS)
-
-if file_time_shared > file_time_local:
-    path_to_bestSOS = path_to_sharedSOS
-    file_time_best = file_time_shared
-else:
-    path_to_bestSOS = path_to_localSOS
-    file_time_best = file_time_local
+file_time_best = os.path.getctime(path_to_sharedSOS)
 
 #Use best SOS for program
 update_time = dt.fromtimestamp(file_time_best).strftime('%m/%d/%Y %H:%M')
-df = pd.read_csv(path_to_bestSOS, parse_dates=[11,19], infer_datetime_format=True)
+df = pd.read_csv(path_to_sharedSOS, parse_dates=[11,19], infer_datetime_format=True)
 
 #columns to delete - INITIAL PASS
 df = df.drop(columns=['ORDERKEY','SO','SS','STORERKEY','INCOTERMS','ORDERDATE','ACTUALSHIPDATE','DAYSPASTDUE',
@@ -87,9 +84,6 @@ df = df.drop(columns=['ORDERKEY','SO','SS','STORERKEY','INCOTERMS','ORDERDATE','
 df = df.rename(columns={'EXTERNORDERKEY':'SO-SS','C_COMPANY':'Customer','ADDDATE':'Add Date','STATUSDESCR':'Status',
                         'TOTALORDERED':'QTY','SVCLVL':'Carrier','EXTERNALLOADID':'Load ID','EDITDATE':'Last Edit',
                         'C_STATE':'State','C_COUNTRY':'Country','Textbox6':'TIS'})
-
-#remove commas from number columns, allows for reading as number then formatting on output
-# df['QTY'] = df['QTY'].str.replace(',', '')
 
 writer = pd.ExcelWriter(path_to_output, engine='xlsxwriter', options={'strings_to_numbers': True})
 workbook = writer.book

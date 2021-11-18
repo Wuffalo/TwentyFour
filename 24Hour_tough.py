@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-2019
+2021
 @author: wuffalo
 """
 
@@ -46,15 +46,24 @@ def format_sheet(X):
         'format': format3
         })
 
-output_directory = "/mnt/shared-drive/05 - Office/OTS/Wolf/"
+output_directory = "/mnt/shared-drive/05 - Office/OTS/Wolf/24 Hour/"
 output_file_name = "24Hour.xlsx"
 path_to_output = output_directory+output_file_name
 
+def empty_folder(dir,name,ext): #directory to remove old files, search term and file extension are optional
+    old_files = glob.glob(dir+'*'+name+'*'+ext)
+    for f in old_files:
+        try:
+            os.remove(f)
+        except:
+            pass
+
 if os.path.exists(path_to_output):
     if os.path.exists(output_directory+'~$'+output_file_name):
-        # print("File is in use. Close \'"+path_to_output+"\' to try again.")
-        raise SystemExit
-    else: os.remove(path_to_output)
+        empty_folder(output_directory,'24Hour','.xlsx')
+        path_to_output = output_directory+os.path.splitext(output_file_name)[0]+str(dt.now().strftime(' %b%d %Hh%Mm '))+".xlsx"
+    else:
+        empty_folder(output_directory,'24Hour','.xlsx')
 
 ctime = dt.now()
 
